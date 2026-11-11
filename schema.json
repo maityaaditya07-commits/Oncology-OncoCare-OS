@@ -1,0 +1,60 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Oncology platform shared contract v0.1",
+  "$defs": {
+    "status": {"enum": ["uploaded", "extracted", "needs_review", "approved", "released"]},
+    "field": {
+      "type": "object",
+      "required": ["name", "value", "source", "flag", "reason"],
+      "properties": {
+        "name": {"enum": ["T", "N", "M", "Stage group", "ER", "PR", "HER2", "Ki-67", "Margins"]},
+        "value": {"type": ["string", "null"]},
+        "source": {"type": ["string", "null"], "description": "Exact sentence from the report text"},
+        "flag": {"type": "boolean"},
+        "reason": {"type": ["string", "null"], "description": "Why flagged, null if not flagged"}
+      }
+    },
+    "summary": {
+      "type": "object",
+      "required": ["report_id", "status", "unresolved_flags", "fields"],
+      "properties": {
+        "report_id": {"type": "string"},
+        "status": {"$ref": "#/$defs/status"},
+        "unresolved_flags": {"type": "integer", "minimum": 0},
+        "source_file": {"type": "string"},
+        "raw_text": {"type": "string"},
+        "fields": {"type": "array", "items": {"$ref": "#/$defs/field"}}
+      }
+    },
+    "approve_request": {
+      "type": "object",
+      "required": ["fields", "approved_by"],
+      "properties": {
+        "approved_by": {"type": "string"},
+        "fields": {"type": "array", "items": {"type": "object", "required": ["name", "value"], "properties": {"name": {"type": "string"}, "value": {"type": ["string", "null"]}, "confirmed": {"type": "boolean"}}}}
+      }
+    },
+    "patient_view": {
+      "type": "object",
+      "required": ["report_id", "status", "language", "sections"],
+      "properties": {
+        "report_id": {"type": "string"},
+        "status": {"const": "approved"},
+        "language": {"enum": ["en", "hi", "bn", "ta", "or"]},
+        "machine_translated": {"type": "boolean"},
+        "sections": {"type": "object", "required": ["diagnosis", "next_steps", "warning_signs"], "properties": {"diagnosis": {"type": "string"}, "next_steps": {"type": "string"}, "warning_signs": {"type": "string"}}},
+        "timeline": {"type": "array", "items": {"type": "object", "properties": {"label": {"type": "string"}, "date": {"type": "string"}, "done": {"type": "boolean"}}}},
+        "body_site": {"type": "string"},
+        "audio_url": {"type": ["string", "null"]},
+        "disclaimer": {"type": "string"}
+      }
+    }
+  },
+  "endpoints": {
+    "POST /upload": "multipart PDF -> {report_id, status}; extraction takes 10 to 30 s",
+    "GET /summary/{id}": "-> summary (doctor only)",
+    "POST /approve/{id}": "approve_request -> {status}; 409 if any flag unresolved",
+    "GET /patient/{id}?lang=hi": "-> patient_view; 403 unless status is approved",
+    "GET /health": "-> {ok: true}"
+  }
+}
